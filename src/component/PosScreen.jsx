@@ -104,11 +104,22 @@ function UserPOS() {
           
           await exponentialBackoff(
             async () => {
-              const response = await fetch(`${network.serverUrl}/sync/batch`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([orderData])
-              });
+              // Try /api/sync/batch first, fallback to /sync/batch
+              let response;
+              try {
+                response = await fetch(`${network.serverUrl}/api/sync/batch`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify([orderData])
+                });
+              } catch (err) {
+                // Fallback to /sync/batch if /api/sync/batch doesn't exist
+                response = await fetch(`${network.serverUrl}/sync/batch`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify([orderData])
+                });
+              }
               
               if (!response.ok) {
                 throw new Error(`Server error: ${response.status}`);

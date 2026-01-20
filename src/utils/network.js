@@ -8,11 +8,11 @@
 // ==========================================
 
 const SERVER_URLS = {
-  // OPTION 1: If you have cloud server (Render/Railway/Heroku)
-  // cloud: 'https://your-backend.onrender.com',
-  
-  // OPTION 2: If testing without cloud (use localhost as cloud)
-  cloud: process.env.REACT_APP_CLOUD_SERVER || 'http://localhost:3001',
+  // Admin Panel API URL (set via environment variable)
+  // For Vercel: Set REACT_APP_CLOUD_SERVER in Vercel dashboard > Settings > Environment Variables
+  // Format: https://your-admin-panel-api-url.com (without /api suffix)
+  // Default: Admin panel at https://pos-admin-l9z6.vercel.app
+  cloud: process.env.REACT_APP_CLOUD_SERVER || process.env.REACT_APP_ADMIN_API_URL || 'https://pos-admin-l9z6.vercel.app',
   
   // Local hotspot (Admin laptop creates WiFi hotspot)
   // This is the IP address when admin laptop creates hotspot
