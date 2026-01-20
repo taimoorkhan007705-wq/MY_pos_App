@@ -153,7 +153,7 @@ export const fetchStats = async () => {
 // Initialize API on module load
 initAPI();
 
-export default {
+const apiService = {
   initAPI,
   isOnline,
   fetchProducts,
@@ -164,3 +164,5 @@ export default {
   deleteOrder,
   fetchStats
 };
+
+export default apiService;

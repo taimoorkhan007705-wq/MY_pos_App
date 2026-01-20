@@ -367,7 +367,7 @@ export const importAllData = async (data) => {
 
 // ==================== DEFAULT EXPORT ====================
 
-export default {
+const dbService = {
   initDB,
   saveProducts,
   getAllProducts,
@@ -390,3 +390,5 @@ export default {
   importAllData,
   generateUniqueOrderId
 };
+
+export default dbService;
