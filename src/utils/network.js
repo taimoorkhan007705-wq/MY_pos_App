@@ -12,14 +12,14 @@ const SERVER_URLS = {
   // cloud: 'https://your-backend.onrender.com',
   
   // OPTION 2: If testing without cloud (use localhost as cloud)
-  cloud: process.env.REACT_APP_CLOUD_SERVER || 'http://localhost:5000',
+  cloud: process.env.REACT_APP_CLOUD_SERVER || 'http://localhost:3001',
   
   // Local hotspot (Admin laptop creates WiFi hotspot)
   // This is the IP address when admin laptop creates hotspot
-  local: process.env.REACT_APP_LOCAL_SERVER || 'http://192.168.137.1:5000',
+  local: process.env.REACT_APP_LOCAL_SERVER || 'http://192.168.137.1:3001',
   
   // Development fallback
-  localhost: 'http://localhost:5000'
+  localhost: 'http://localhost:3001'
 };
 
 let cachedMode = null;

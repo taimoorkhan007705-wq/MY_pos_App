@@ -1,7 +1,7 @@
 // API Service - Backend Connection with Dynamic Server Detection
 import { getServerUrl } from '../utils/network';
 
-let API_URL = 'http://localhost:5000/api';
+let API_URL = 'http://localhost:3001/api';
 let currentServerUrl = null;
 
 /**
@@ -21,8 +21,8 @@ export const initAPI = async () => {
     return API_URL;
   } catch (error) {
     console.error('Failed to initialize API:', error);
-    // Fallback to localhost
-    API_URL = 'http://localhost:5000/api';
+    // Fallback to localhost (same port as backend)
+    API_URL = 'http://localhost:3001/api';
     return API_URL;
   }
 };
@@ -108,7 +108,8 @@ export const createOrder = async (orderData) => {
 export const updateOrderStatus = async (orderId, status) => {
   try {
     const url = await getAPIUrl();
-    const response = await fetch(`${url}/orders/${orderId}/status`, {
+    // Backend expects PATCH /api/orders/:id with { status }
+    const response = await fetch(`${url}/orders/${orderId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })

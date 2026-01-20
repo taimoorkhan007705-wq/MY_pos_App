@@ -1,407 +1,229 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  getAllProducts,
-  getCurrentOrder,
-  addItemToOrder,
-  updateItemQuantity,
-  saveOrder,
-  clearCurrentOrder
-} from '../../services/db';
-import { createOrder as apiCreateOrder } from '../../services/api';
-import { categories } from '../../data/products';
+import { products as localData } from '../../data/products';
 import { 
-  MdShoppingCart, 
-  MdAdd, 
-  MdRemove, 
-  MdPerson,
-  MdAdminPanelSettings
-} from 'react-icons/md';
+  getAllProducts, addItemToOrder, getCurrentOrder, 
+  updateItemQuantity, saveOrder, saveProducts 
+} from '../../services/db';
+import { createOrder as apiCreateOrder, fetchProducts } from '../../services/api';
+import WiFiQRModal from '../shared/WiFiQRModal';
 
-function UserPOS() {
+const UserPOS = () => {
   const [products, setProducts] = useState([]);
-  const [currentOrder, setCurrentOrder] = useState({ items: [], total: 0 });
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [cart, setCart] = useState({ items: [], total: 0 });
   const [customerName, setCustomerName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [orderSuccess, setOrderSuccess] = useState(null);
-  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('All');
+  const [showCart, setShowCart] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
-
+  // Get current network IP for WiFi QR code
+  const getNetworkUrl = () => {
+    // Try to get the hotspot IP from window location
+    const currentUrl = window.location.origin;
+    // Default to the hotspot IP: 192.168.137.1 on port 3002
+    return currentUrl.includes('localhost') ? 'http://192.168.137.1:3002' : currentUrl;
+  };
 
   useEffect(() => {
-    loadData();
+    const init = async () => {
+      try {
+        // Try to fetch products from backend
+        console.log('📦 Fetching products from backend...');
+        const backendProducts = await fetchProducts();
+        
+        if (backendProducts && backendProducts.length > 0) {
+          // Save fetched products to local DB
+          await saveProducts(backendProducts);
+          setProducts(backendProducts);
+          console.log('✅ Loaded', backendProducts.length, 'products from backend');
+        } else {
+          // Fallback to local data if backend returns empty
+          await saveProducts(localData);
+          const data = await getAllProducts();
+          setProducts(data);
+          console.log('ℹ️ Using local products data');
+        }
+      } catch (error) {
+        // Fallback to local data if backend is unavailable
+        console.warn('⚠️ Backend unavailable, using local products:', error.message);
+        await saveProducts(localData);
+        const data = await getAllProducts();
+        setProducts(data);
+      }
+      
+      setCart(await getCurrentOrder());
+    };
+    init();
   }, []);
 
-  const loadData = async () => {
-    try {
-      const allProducts = await getAllProducts();
-      setProducts(allProducts);
-      
-      const order = await getCurrentOrder();
-      setCurrentOrder(order);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    }
+  const handleAdd = async (p) => {
+    setCart(await addItemToOrder(p));
+    setShowCart(true);
   };
 
-  const handleAddProduct = async (product) => {
-    try {
-      const updatedOrder = await addItemToOrder(product, 1);
-      setCurrentOrder(updatedOrder);
+  const handleQty = async (id, q) => setCart(await updateItemQuantity(id, q));
 
-      // Visual feedback
-      const btn = document.querySelector(`[data-product-id="${product.id}"]`);
-      if (btn) {
-        btn.classList.add('added');
-        setTimeout(() => btn.classList.remove('added'), 300);
-      }
-    } catch (error) {
-      console.error('Failed to add:', error);
-    }
-  };
-
-  const handleUpdateQuantity = async (productId, quantity) => {
-    try {
-      const updatedOrder = await updateItemQuantity(productId, quantity);
-      setCurrentOrder(updatedOrder);
-    } catch (error) {
-      console.error('Failed to update:', error);
-    }
-  };
-
-  const handlePlaceOrder = async () => {
-    if (currentOrder.items.length === 0) {
-      alert('❌ Cart is empty!');
+  const handleConfirm = async () => {
+    if (cart.items.length === 0) {
+      alert('Cart is empty');
       return;
     }
 
     if (!customerName.trim()) {
-      alert('❌ Please enter customer name');
+      alert('Please enter a Customer Name');
       return;
     }
 
     try {
-      setLoading(true);
-      
-      // Save locally with 4-digit ID
-      const localOrder = await saveOrder({ 
-        customerName: customerName.trim() 
-      });
-      
-      // Try to save to server
-      if (navigator.onLine) {
-        try {
-          await apiCreateOrder({
-            orderId: localOrder.orderId,
-            customerName: customerName.trim(),
-            items: currentOrder.items,
-            total: currentOrder.total
-          });
-          console.log('✅ Synced to server');
-        } catch (error) {
-          console.log('⚠️ Server save failed, saved locally');
-        }
+      // Save locally (IndexedDB) and get generated orderId
+      const localOrder = await saveOrder({ customerName: customerName.trim() });
+
+      // Try to sync to backend API (laptop)
+      try {
+        await apiCreateOrder({
+          orderId: localOrder.orderId,
+          customerName: localOrder.customerName || customerName.trim(),
+          items: localOrder.items,
+          total: localOrder.total
+        });
+        console.log('✅ Order synced to server');
+      } catch (err) {
+        console.error('⚠️ Order saved locally only, server error:', err);
+        // We keep local data; syncWithServer can push later when online
       }
-      
-      // Show success with order ID
-      setOrderSuccess({
-        orderId: localOrder.orderId,
-        total: currentOrder.total
-      });
-      
+
+      setCart({ items: [], total: 0 });
       setCustomerName('');
-      const order = await getCurrentOrder();
-      setCurrentOrder(order);
-      
-    } catch (error) {
-      alert('❌ Failed: ' + error.message);
-    } finally {
-      setLoading(false);
+      setShowCart(false);
+      alert(`Order Confirmed Successfully!\nOrder ID: ${localOrder.orderId}`);
+    } catch (err) {
+      alert('❌ Failed to place order: ' + err.message);
     }
   };
 
-  const handleClearOrder = async () => {
-    if (!window.confirm('Clear cart?')) return;
-    
-    try {
-      await clearCurrentOrder();
-      const order = await getCurrentOrder();
-      setCurrentOrder(order);
-    } catch (error) {
-      console.error('Failed to clear:', error);
-    }
-  };
-
-  const filteredProducts = products.filter(p => {
-    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
-    return matchesCategory && p.available;
-  });
+  const categories = ['All', ...new Set(products.map(p => p.category))];
 
   return (
-    <div className="app">
-      {/* Header */}
-      <header className="app-header">
-        <div className="logo">
-          <div style={{ fontSize: '2rem' }}>🏪</div>
-          <div className="logo-text">
-            <h1>POS System</h1>
-            <p className="tagline">Place Your Order</p>
+    <div className={`pos-container ${showCart ? 'cart-open' : ''}`}>
+      {!showCart && (
+        <button className="white-cart-fab" onClick={() => setShowCart(true)}>
+          <span className="fab-icon">🛒</span>
+          {cart.items.length > 0 && <span className="fab-badge">{cart.items.length}</span>}
+        </button>
+      )}
+
+      <main className="menu-side">
+        <header className="menu-header">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <h1>VIBE<span>POS</span></h1>
+            <button 
+              onClick={() => setShowQRModal(true)}
+              style={{
+                padding: '0.6rem 1.2rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+              }}
+            >
+              <span style={{ fontSize: '1.2rem' }}>📱</span>
+              WiFi QR
+            </button>
           </div>
-        </div>
-
-        <div className="header-actions">
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            background: 'var(--bg)',
-            borderRadius: '20px',
-            fontWeight: 600
-          }}>
-            <MdShoppingCart size={20} />
-            <span>{currentOrder.items.reduce((sum, item) => sum + item.quantity, 0)} items</span>
+          <div className="tabs">
+            {categories.map(c => (
+              <button 
+                key={c} 
+                className={`${activeTab === c ? 'active' : ''} cat-btn-${c.toLowerCase()}`} 
+                onClick={() => setActiveTab(c)}
+              >
+                {c}
+              </button>
+            ))}
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="app-main">
-        <div className="pos-screen">
-          {/* Products Section */}
-          <div className="products-section">
-            <div className="section-header">
-              <h2>Menu</h2>
-            </div>
-
-            {/* Categories */}
-            <div className="categories-tabs">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory(cat.id)}
-                >
-                  <span style={{ fontSize: '1.25rem' }}>{cat.icon}</span>
-                  <span>{cat.name}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Products Grid */}
-            <div className="products-grid">
-              {filteredProducts.length === 0 ? (
-                <div style={{ 
-                  gridColumn: '1 / -1',
-                  textAlign: 'center',
-                  padding: '3rem',
-                  color: 'var(--text-light)'
-                }}>
-                  <p>No products available</p>
-                </div>
-              ) : (
-                filteredProducts.map(product => (
-                  <button
-                    key={product.id}
-                    className="product-card"
-                    onClick={() => handleAddProduct(product)}
-                    data-product-id={product.id}
-                  >
-                    <div className="product-icon">{product.image}</div>
-                    <div className="product-name">{product.name}</div>
-                    <div className="product-price">Rs. {product.price}</div>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Cart Section */}
-          <div className="cart-section">
-            <div className="section-header">
-              <h2>Cart</h2>
-              {currentOrder.items.length > 0 && (
-                <button 
-                  onClick={handleClearOrder}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: 'var(--danger)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Customer Name */}
-            <div className="customer-input">
-              <div style={{ position: 'relative' }}>
-                <MdPerson 
-                  size={20} 
-                  style={{ 
-                    position: 'absolute', 
-                    left: '0.75rem', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-light)'
-                  }} 
-                />
-                <input
-                  type="text"
-                  placeholder="Customer Name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  style={{ paddingLeft: '2.5rem' }}
-                />
+        <div className="product-grid">
+          {products.filter(p => activeTab === 'All' || p.category === activeTab).map(p => (
+            <div key={p.id} className="product-card">
+              <div className="img-container">
+                <img src={p.image} alt={p.name} loading="lazy" />
+                <button className="quick-add" onClick={() => handleAdd(p)}>+</button>
+              </div>
+              <div className="product-details">
+                <h4 className="professional-title">{p.name}</h4>
+                <p className="professional-price">Rs {p.price.toLocaleString()}</p>
               </div>
             </div>
-
-            {/* Cart Items */}
-            <div className="cart-items">
-              {currentOrder.items.length === 0 ? (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: 'var(--text-light)',
-                  padding: '2rem'
-                }}>
-                  <MdShoppingCart size={64} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-                  <p>Cart is empty</p>
-                  <p style={{ fontSize: '0.875rem' }}>Add items to get started</p>
-                </div>
-              ) : (
-                currentOrder.items.map(item => (
-                  <div key={item.id} className="cart-item">
-                    <div className="item-icon">{item.image}</div>
-                    <div className="item-details">
-                      <div className="item-name">{item.name}</div>
-                      <div className="item-price">Rs. {item.price}</div>
-                    </div>
-
-                    <div className="item-controls">
-                      <button
-                        className="qty-btn"
-                        onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                      >
-                        <MdRemove />
-                      </button>
-                      <span style={{ fontWeight: 700, minWidth: '30px', textAlign: 'center' }}>
-                        {item.quantity}
-                      </span>
-                      <button
-                        className="qty-btn"
-                        onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                      >
-                        <MdAdd />
-                      </button>
-                    </div>
-
-                    <div className="item-total">
-                      Rs. {item.price * item.quantity}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Summary */}
-            {currentOrder.items.length > 0 && (
-              <>
-                <div className="cart-summary">
-                  <div className="summary-row total">
-                    <span>Total:</span>
-                    <span>Rs. {currentOrder.total}</span>
-                  </div>
-                </div>
-
-                <button
-                  className="place-order-btn"
-                  onClick={handlePlaceOrder}
-                  disabled={loading}
-                >
-                  {loading ? 'Processing...' : '✓ Place Order'}
-                </button>
-              </>
-            )}
-          </div>
+          ))}
         </div>
       </main>
 
-      {/* Success Modal */}
-      {orderSuccess && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setOrderSuccess(null)}
-        >
-          <div 
-            style={{
-              background: 'white',
-              padding: '2rem',
-              borderRadius: '16px',
-              textAlign: 'center',
-              maxWidth: '400px',
-              width: '90%'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
-            <h2 style={{ marginBottom: '1rem' }}>Order Placed!</h2>
-            <div style={{
-              padding: '1rem',
-              background: 'var(--bg)',
-              borderRadius: '8px',
-              marginBottom: '1rem'
-            }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-light)', marginBottom: '0.5rem' }}>
-                Order ID
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>
-                #{orderSuccess.orderId}
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 600, marginTop: '0.5rem' }}>
-                Total: Rs. {orderSuccess.total}
-              </div>
-            </div>
-            <button
-              onClick={() => setOrderSuccess(null)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'var(--primary)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Continue
-            </button>
-          </div>
+      {showCart && <div className="overlay" onClick={() => setShowCart(false)} />}
+
+      <aside className="cart-sidebar">
+        <div className="cart-header">
+          <h3>Order Review</h3>
+          <button className="close-btn" onClick={() => setShowCart(false)}>✕</button>
         </div>
-      )}
+        
+        <div className="customer-section">
+          <label>Customer Name</label>
+          <input 
+            className="name-input" 
+            placeholder="Type name here..." 
+            value={customerName} 
+            onChange={e => setCustomerName(e.target.value)} 
+          />
+        </div>
+
+        <div className="cart-items">
+          {cart.items.length === 0 ? <p className="empty-msg">Empty Cart</p> : 
+            cart.items.map(item => (
+              <div key={item.id} className="cart-row">
+                <div className="row-info"><p>{item.name}</p><small>Rs {item.price}</small></div>
+                <div className="row-qty">
+                  <button onClick={() => handleQty(item.id, item.quantity - 1)}>-</button>
+                  <span>{item.quantity}</span>
+                  <button onClick={() => handleQty(item.id, item.quantity + 1)}>+</button>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+        <div className="cart-footer">
+          <div className="total-box"><span>Grand Total</span><b>Rs {cart.total.toLocaleString()}</b></div>
+          <button className="confirm-btn" onClick={handleConfirm} disabled={cart.items.length === 0}>
+            FINALIZE ORDER
+          </button>
+        </div>
+      </aside>
+
+      {/* WiFi QR Code Modal */}
+      <WiFiQRModal 
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        wifiSSID="Connectify-Hotspot"
+        wifiPassword="12345678"
+        userPanelUrl={getNetworkUrl()}
+      />
     </div>
   );
-}
+};
 
 export default UserPOS;

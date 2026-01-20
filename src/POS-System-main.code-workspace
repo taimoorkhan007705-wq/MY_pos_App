@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../../POS-System-main"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "POS-System-main"
+	}
+}
