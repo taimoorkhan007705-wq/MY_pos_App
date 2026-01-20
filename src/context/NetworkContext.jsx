@@ -83,22 +83,12 @@ export function NetworkProvider({ children }) {
         if (!queued || queued.length === 0) return;
 
         const { url } = await getServerUrl();
-        // POST batch - try /api/sync/batch first, fallback to /sync/batch
-        let resp;
-        try {
-          resp = await fetch(`${url}/api/sync/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(queued)
-          });
-        } catch (err) {
-          // Fallback to /sync/batch if /api/sync/batch doesn't exist
-          resp = await fetch(`${url}/sync/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(queued)
-          });
-        }
+        // POST batch - Backend uses /sync/batch (not /api/sync/batch)
+        const resp = await fetch(`${url}/sync/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(queued)
+        });
 
         if (resp.ok || resp.status === 202 || resp.status === 207) {
           const data = await resp.json();
