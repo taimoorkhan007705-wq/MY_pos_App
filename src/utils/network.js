@@ -8,16 +8,16 @@
 // ==========================================
 
 const SERVER_URLS = {
-  // OPTION 1: If you have cloud server (Render/Railway/Heroku)
-  // cloud: 'https://your-backend.onrender.com',
-  
-  // OPTION 2: If testing without cloud (use localhost as cloud)
-  cloud: process.env.REACT_APP_CLOUD_SERVER || 'http://localhost:3001',
-  
+  // Cloud / production backend (Vercel deployment)
+  // NOTE: You can still override this with REACT_APP_CLOUD_SERVER
+  cloud:
+    process.env.REACT_APP_CLOUD_SERVER ||
+    'https://pos-backend-sooty.vercel.app',
+
   // Local hotspot (Admin laptop creates WiFi hotspot)
   // This is the IP address when admin laptop creates hotspot
   local: process.env.REACT_APP_LOCAL_SERVER || 'http://192.168.137.1:3001',
-  
+
   // Development fallback
   localhost: 'http://localhost:3001'
 };

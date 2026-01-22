@@ -1,7 +1,8 @@
 // API Service - Backend Connection with Dynamic Server Detection
 import { getServerUrl } from '../utils/network';
 
-let API_URL = 'http://localhost:3001/api';
+// Default to deployed backend; can be overridden by getServerUrl detection
+let API_URL = 'https://pos-backend-sooty.vercel.app/api';
 let currentServerUrl = null;
 
 /**
@@ -21,8 +22,8 @@ export const initAPI = async () => {
     return API_URL;
   } catch (error) {
     console.error('Failed to initialize API:', error);
-    // Fallback to localhost (same port as backend)
-    API_URL = 'http://localhost:3001/api';
+    // Fallback to deployed backend instead of localhost in production
+    API_URL = 'https://pos-backend-sooty.vercel.app/api';
     return API_URL;
   }
 };
