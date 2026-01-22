@@ -13,7 +13,8 @@ const NetworkContext = createContext(null);
  * Network Provider - manages connectivity state and server selection
  */
 export function NetworkProvider({ children }) {
-  const [serverUrl, setServerUrl] = useState('http://localhost:5000');
+  // Default to backend port used across this repo (3001)
+  const [serverUrl, setServerUrl] = useState('http://localhost:3001');
   const [mode, setMode] = useState('disconnected'); // 'online' | 'local' | 'localhost' | 'disconnected'
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queuedCount, setQueuedCount] = useState(0);
@@ -83,7 +84,7 @@ export function NetworkProvider({ children }) {
         if (!queued || queued.length === 0) return;
 
         const { url } = await getServerUrl();
-        // POST batch
+        // POST batch - Backend uses /sync/batch (not /api/sync/batch)
         const resp = await fetch(`${url}/sync/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

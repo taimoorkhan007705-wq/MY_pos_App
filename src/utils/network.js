@@ -8,12 +8,12 @@
 // ==========================================
 
 const SERVER_URLS = {
-  // Cloud / production backend (Vercel deployment)
-  // NOTE: You can still override this with REACT_APP_CLOUD_SERVER
-  cloud:
-    process.env.REACT_APP_CLOUD_SERVER ||
-    'https://pos-backend-sooty.vercel.app',
-
+  // Backend API URL (set via environment variable)
+  // For Vercel: Set REACT_APP_CLOUD_SERVER in Vercel dashboard > Settings > Environment Variables
+  // Format: https://your-backend-api-url.com (without /api suffix)
+  // Default: Backend API at https://pos-backend-sooty.vercel.app
+  cloud: process.env.REACT_APP_CLOUD_SERVER || process.env.REACT_APP_BACKEND_URL || 'https://pos-backend-sooty.vercel.app',
+  
   // Local hotspot (Admin laptop creates WiFi hotspot)
   // This is the IP address when admin laptop creates hotspot
   local: process.env.REACT_APP_LOCAL_SERVER || 'http://192.168.137.1:3001',

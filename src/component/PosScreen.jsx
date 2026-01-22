@@ -104,6 +104,7 @@ function UserPOS() {
           
           await exponentialBackoff(
             async () => {
+              // Backend uses /sync/batch (not /api/sync/batch)
               const response = await fetch(`${network.serverUrl}/sync/batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
